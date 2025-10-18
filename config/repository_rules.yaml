@@ -1,0 +1,44 @@
+# Repository specific rules and prompts
+repositories:
+  subscription-service:
+    description: "Subscription management service"
+    tech_stack:
+      language: "java"
+      version: "8"
+      framework: "spring-cloud"
+      database: "postgresql"
+      migration: "flyway"
+      caching: "google-guava"
+    
+    rules:
+      - "No manual test writing required"
+      - "Database migrations must be added to all environments (default, prp, test)"
+      - "Database migration path: resources/db/{environment}"
+      - "Use sequences for ID generation in PostgreSQL, avoid manual IDs"
+      - "Google Guava Cache is the only allowed caching solution"
+    
+    prompts:
+      code_review: |
+        As a code reviewer for subscription-service, consider these specific requirements:
+        1. Verify Java 8 compatibility
+        2. Ensure Spring Cloud patterns are followed
+        3. Check for proper Guava Cache usage
+        4. Validate Flyway migrations:
+           - Scripts should be in all environments (default, prp, test)
+           - IDs must use sequences, not manual values
+        5. No test requirements for this repository
+
+      pr_analysis: |
+        When analyzing pull requests for subscription-service:
+        1. Check resources/db/ for proper Flyway script placement
+        2. Verify sequence usage in PostgreSQL scripts
+        3. Validate Java 8 syntax usage
+        4. Review Spring Cloud component usage
+        5. Inspect cache implementation (only Guava allowed)
+
+# You can add more repositories following the same structure
+# example-repo:
+#   description: "..."
+#   tech_stack: {}
+#   rules: []
+#   prompts: {}

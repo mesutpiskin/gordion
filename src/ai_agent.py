@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Dict, List, Optional
 from openai import OpenAI
+from .repository_rules import RepositoryRulesManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ class AIAgent:
     """AI agent for PR analysis"""
     
     def __init__(self, api_key: str, model: str = "gpt-4", 
-                 temperature: float = 0.3, max_tokens: int = 2000):
+                 temperature: float = 0.3, max_tokens: int = 2000,
+                 rules_config_path: str = "config/repository_rules.yaml"):
         """
         Initialize AI agent
         
@@ -23,11 +25,13 @@ class AIAgent:
             model: Model to use
             temperature: Temperature parameter
             max_tokens: Maximum tokens
+            rules_config_path: Path to repository rules config
         """
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.rules_manager = RepositoryRulesManager(rules_config_path)
         
         self.system_prompt = """Sen bir kod review uzmanısın. Sana bir Pull Request'in detayları verilecek.
 Görevin, PR'ı analiz edip approve edilmesi gerekip gerekmediğini değerlendirmek.
@@ -48,58 +52,96 @@ Cevabını şu JSON formatında ver (sadece JSON, başka açıklama ekleme):
   "concerns": ["endişe 1", "endişe 2", ...]
 }"""
     
-    def analyze_pull_request(self, pr_info: Dict) -> Optional[Dict]:
+    def _enhance_prompt_with_repo_rules(self, repository_name: str, prompt_type: str, base_prompt: str) -> str:
+        """
+        Enhance the base prompt with repository specific rules and prompts
+        
+        Args:
+            repository_name: Name of the repository
+            prompt_type: Type of prompt (e.g. code_review, pr_analysis)
+            base_prompt: Base prompt to enhance
+            
+        Returns:
+            Enhanced prompt with repository rules
+        """
+        # Get repository specific prompts
+        repo_prompts = self.rules_manager.get_repository_prompts(repository_name)
+        repo_rules = self.rules_manager.get_repository_rules(repository_name)
+        repo_config = self.rules_manager.get_repository_config(repository_name)
+        
+        # If no repository specific config exists, return base prompt
+        if not repo_config:
+            return base_prompt
+            
+        # Build tech stack section
+        tech_stack = repo_config.get('tech_stack', {})
+        tech_stack_prompt = "\nRepository Technology Stack:\n"
+        for key, value in tech_stack.items():
+            tech_stack_prompt += f"- {key}: {value}\n"
+            
+        # Build rules section
+        rules_prompt = "\nRepository Specific Rules:\n"
+        for rule in repo_rules:
+            rules_prompt += f"- {rule}\n"
+            
+        # Get repository specific prompt for this type if exists
+        specific_prompt = repo_prompts.get(prompt_type, "")
+        
+        # Combine all prompts
+        enhanced_prompt = f"""
+{base_prompt}
+
+Repository Context:
+{tech_stack_prompt}
+{rules_prompt}
+
+Repository Specific Guidelines:
+{specific_prompt}
+"""
+        return enhanced_prompt.strip()
+
+    def analyze_pr(self, pr_data: Dict, repository_name: str) -> Dict:
         """
         Analyze a pull request using AI
         
         Args:
-            pr_info: Dictionary containing PR information
+            pr_data: Pull request data
+            repository_name: Name of the repository
             
         Returns:
-            Analysis result dictionary with approve decision, or None if AI fails
+            Analysis results
         """
         logger.info(f"Analyzing PR #{pr_info.get('id')} with AI...")
         
         # Prepare PR summary for AI
         pr_summary = self._prepare_pr_summary(pr_info)
         
+        # Get base prompt from config
+        base_prompt = "Please review this pull request..."  # Load from config
+        
+        # Enhance prompt with repository rules
+        enhanced_prompt = self._enhance_prompt_with_repo_rules(
+            repository_name=repository_name,
+            prompt_type="pr_analysis",
+            base_prompt=base_prompt
+        )
+        
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": pr_summary}
+                    {"role": "system", "content": enhanced_prompt},
+                    {"role": "user", "content": json.dumps(pr_data)}
                 ],
                 temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                timeout=30  # 30 saniye timeout
+                max_tokens=self.max_tokens
             )
             
-            content = response.choices[0].message.content
-            logger.debug(f"AI Response: {content}")
+            return json.loads(response.choices[0].message.content)
             
-            # Parse JSON response
-            result = json.loads(content)
-            
-            # Validate result
-            required_fields = ['approve', 'confidence_score', 'reasoning']
-            if not all(field in result for field in required_fields):
-                logger.error("AI response missing required fields")
-                return None
-            
-            logger.info(f"AI Analysis: approve={result['approve']}, "
-                       f"confidence={result['confidence_score']}")
-            
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI response as JSON: {e}")
-            logger.warning("⚠️  AI JSON parse hatası - AI analizi başarısız")
-            return None
         except Exception as e:
-            logger.error(f"AI analysis failed: {e}")
-            logger.warning("⚠️  AI bağlantı/analiz hatası - AI kullanılamıyor")
-            return None
+            logger.error(f"Error analyzing PR: {str(e)}")
+            return {"error": str(e)}
     
     def _prepare_pr_summary(self, pr_info: Dict) -> str:
         """
