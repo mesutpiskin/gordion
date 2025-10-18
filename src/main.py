@@ -46,7 +46,7 @@ class StashAgentApp:
         )
         
         logger.info("=" * 60)
-        logger.info("Stash PR Auto-Approve Agent Starting...")
+        logger.info("Gordion AI Code Review Agent Starting...")
         logger.info("=" * 60)
         
         # Initialize database

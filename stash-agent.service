@@ -1,5 +1,5 @@
 [Unit]
-Description=Stash PR Auto-Approve Agent
+Description=Gordion AI Code Review Agent
 After=network.target
 
 [Service]
