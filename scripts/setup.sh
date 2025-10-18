@@ -2,8 +2,14 @@
 
 # Setup script for Stash Agent
 
+# Get the parent directory (project root)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Change to project root directory
+cd "$PROJECT_ROOT"
+
 echo "========================================"
-echo "Stash PR Auto-Approve Agent Setup"
+echo "Gordion AI Code Review Agent Setup"
 echo "========================================"
 echo ""
 

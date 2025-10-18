@@ -3,6 +3,9 @@
 # Gordion PR Agent Dashboard Launcher
 # Bu script dashboard'u başlatır
 
+# Get the parent directory (project root)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 echo "🚀 Starting Gordion PR Agent Dashboard..."
 echo ""
 
@@ -11,6 +14,9 @@ if ! command -v python3 &> /dev/null; then
     echo "❌ Python3 not found. Please install Python 3.8+"
     exit 1
 fi
+
+# Change to project root directory
+cd "$PROJECT_ROOT"
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
