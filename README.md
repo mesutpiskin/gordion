@@ -49,15 +49,16 @@ Gordion is an autonomous AI agent that reviews Pull Requests assigned to you on 
 | Extensibility | Add new models & languages with minimal changes |
 | Repository Rules | Custom rules & prompts per repository |
 
-```
+
 
 ---
 
 ## 🚀 Quick Start
 
 ### Option A: Dashboard (Recommended)
+
 ```bash
-git clone https://github.com/yourusername/gordion-ai-review.git
+git https://github.com/mesutpiskin/gordion.git
 cd gordion-ai-review
 cp .env.example .env
 nano .env       # Set STASH_URL + STASH_TOKEN
@@ -263,15 +264,85 @@ language: en   # or 'tr'
 ---
 
 ## 📊 How It Works
+```mermaid
+graph TD;
+    A[Pull Request Assignment]-->B[Repository Analysis];
+    B-->C1[Load Default Rules];
+    B-->C2[Load Repository Rules];
+    C1-->C3[Merge Rules];
+    C2-->C3;
+    C3-->D[Fetch PR Diff];
+    
+    D-->E[Size Check];
+    E-->|Oversized|F[Apply Size Rules];
+    F-->|Auto-Approve|K[Final Decision];
+    F-->|Reject|K;
+    
+    E-->|Normal Size|G[AI Analysis];
+    G-->H[Apply Repository Rules];
+    H-->I[Calculate Confidence Score];
+    
+    I-->|Score ≥ Threshold|J[Approve PR];
+    I-->|Score < Threshold|L[Mark as Needs Work];
+    
+    J-->K;
+    L-->K;
+    
+    G-->|AI Failure|M[Fallback Logic];
+    M-->|Auto-Approve*|K;
+    M-->|Manual Review|K;
+    
+    K-->N[Add Comments];
+    N-->O[Update PR Status];
+    
+    subgraph RRP[Repository Rules Processing]
+        C;
+        H;
+    end;
+    
+    subgraph AIP[AI Analysis Pipeline]
+        G;
+        I;
+    end;
+    
+    subgraph DM[Decision Making]
+        K;
+        N;
+        O;
+    end;
 ```
-Pull Requests → Fetch Diff → AI Analysis → Confidence Score → Decision
-                       |                                |
-                       |                     ≥ Threshold → APPROVE (+comment)
-                       |                     < Threshold → NEEDS WORK (+reasons)
-                       |                     AI Failure → Fallback (auto-approve*)
-                       * configurable
-```
-Process runs every `CHECK_INTERVAL` seconds. Oversized PRs can bypass deep AI to maintain throughput.
+
+Process runs every `CHECK_INTERVAL` seconds with the following flow:
+
+1. **Repository Configuration**
+   - Load repository-specific rules from `repository_rules.yaml`
+   - Apply custom prompts and technical requirements
+   - Set language-specific analysis parameters
+
+2. **Pull Request Analysis**
+   - Check PR size against configured limits
+   - For oversized PRs: Apply configurable auto-approve rules
+   - For normal PRs: Proceed to deep analysis
+
+3. **AI Processing**
+   - Apply repository-specific prompts
+   - Analyze code changes using Ollama/OpenAI
+   - Consider tech stack requirements
+   - Validate against repository rules
+
+4. **Decision Making**
+   - Calculate confidence score based on analysis
+   - Apply repository-specific thresholds
+   - Handle AI failures with configurable fallback
+   - Generate structured feedback
+
+5. **Action Execution**
+   - Update PR status (Approve/Needs Work)
+   - Add inline comments if configured
+   - Provide detailed reasoning in PR comment
+   - Log decision and metrics
+
+*Note: Fallback behavior is configurable via `config.yaml`
 
 ### Decision Logic (Default)
 - Approve when `confidence >= 70`, size within limits.
@@ -327,7 +398,7 @@ stash-agent/
 
 ### Local Dev
 ```bash
-git clone https://github.com/yourusername/gordion-ai-review.git
+git https://github.com/mesutpiskin/gordion.git
 cd gordion-ai-review
 pip install -r requirements.txt
 ./start_dashboard.sh
