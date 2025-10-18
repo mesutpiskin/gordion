@@ -1,0 +1,17 @@
+[Unit]
+Description=Stash PR Auto-Approve Agent
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/path/to/stash-agent
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 /path/to/stash-agent/src/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/path/to/stash-agent/logs/systemd.log
+StandardError=append:/path/to/stash-agent/logs/systemd.log
+
+[Install]
+WantedBy=multi-user.target

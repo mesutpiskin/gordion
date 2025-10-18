@@ -1,0 +1,38 @@
+ai:
+  max_tokens: 2000
+  model: gpt-4
+  ollama_model: deepseek-coder:33b
+  system_prompt: "Sen bir kod review uzmanısın. Sana bir Pull Request'in detayları\
+    \ verilecek.\nGörevin, PR'ı analiz edip approve edilmesi gerekip gerekmediğini\
+    \ değerlendirmek.\n\nDeğerlendirme kriterleri:\n1. Kod değişiklikleri mantıklı\
+    \ ve temiz mi?\n2. Potansiyel bug'lar var mı?\n3. Security riskleri var mı?\n\
+    4. Best practice'lere uyuyor mu?\n5. Test dosyaları dahil mi?\n\nCevabını şu formatta\
+    \ ver:\n{\n  \"approve\": true/false,\n  \"confidence_score\": 0-100,\n  \"reasoning\"\
+    : \"detaylı açıklama\",\n  \"concerns\": [\"endişe 1\", \"endişe 2\", ...]\n}\n"
+  temperature: 0.3
+approval_criteria:
+  add_inline_comments_on_reject: true
+  auto_approve_on_ai_failure: true
+  auto_approve_oversized: true
+  comment_on_reject: true
+  critical_file_patterns:
+  - '*/config/production/*'
+  - '*/database/migrations/*'
+  - '*/security/*'
+  - '*/.env*'
+  - '*/credentials/*'
+  decline_on_reject: false
+  mark_needs_work_on_reject: true
+  max_files_changed: 50
+  max_lines_changed: 1000
+  min_confidence_score: 56
+check_interval: 300
+dry_run: false
+logging:
+  console: true
+  file: logs/agent.log
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  level: INFO
+notifications:
+  enabled: false
+  webhook_url: ''
