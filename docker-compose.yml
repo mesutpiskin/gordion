@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  agent:
+    build: .
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - STASH_URL=${STASH_URL}
+      - STASH_TOKEN=${STASH_TOKEN}
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-300}
+      - DRY_RUN=${DRY_RUN:-false}
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  dashboard:
+    build: .
+    command: streamlit run src/dashboard.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    ports:
+      - "8501:8501"
+    environment:
+      - STASH_URL=${STASH_URL}
+      - STASH_TOKEN=${STASH_TOKEN}
+    depends_on:
+      - agent
+
+volumes:
+  ollama_data:

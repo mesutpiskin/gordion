@@ -66,7 +66,29 @@ nano .env       # Set STASH_URL + STASH_TOKEN
 ```
 Dashboard: http://localhost:8501
 
-### Option B: Headless Agent
+### Option B: Docker (Production Ready)
+```bash
+# Clone the repository
+git clone https://github.com/mesutpiskin/gordion.git
+cd gordion-ai-review
+
+# Create and configure environment file
+cp .env.example .env
+nano .env       # Set STASH_URL + STASH_TOKEN
+
+# Start all services (agent + dashboard + ollama)
+docker-compose up -d
+
+# Or start specific services
+docker-compose up -d agent     # Only the review agent
+docker-compose up -d dashboard # Only the dashboard
+```
+
+Access:
+- Dashboard: http://localhost:8501
+- Ollama API: http://localhost:11434
+
+### Option C: Headless Agent
 ```bash
 ./setup.sh
 python3 tests/test_connection.py
@@ -385,6 +407,8 @@ stash-agent/
 ├─ logs/               # Runtime logs
 ├─ agent.sh            # Control script
 ├─ start_dashboard.sh  # Dashboard launcher
+├─ Dockerfile          # Container definition
+├─ docker-compose.yml  # Multi-container setup
 └─ requirements.txt    # Python dependencies
 ```
 
