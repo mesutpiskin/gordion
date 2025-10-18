@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+  <img src="docs/resources/logo.png" alt="Gordion Logo" width="120" />
+</p>
+
 # 🗡️ Gordion AI Code Review Agent
 
 **Cut through complexity. Approve with confidence.**
