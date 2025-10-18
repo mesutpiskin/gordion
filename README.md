@@ -47,6 +47,9 @@ Gordion is an autonomous AI agent that reviews Pull Requests assigned to you on 
 | Security | Personal Access Tokens, minimal scope, audit trail |
 | Oversized Handling | Large PRs can auto‑approve or be flagged based on config |
 | Extensibility | Add new models & languages with minimal changes |
+| Repository Rules | Custom rules & prompts per repository |
+
+```
 
 ---
 
@@ -195,16 +198,67 @@ ai:
 language: en   # or 'tr'
 ```
 
-### Prompt Customization
-Edit `config/prompts.yaml` to change tone, criteria, or add languages:
-```yaml
-language: en
-en:
-  pr_analysis_system_prompt: |
-    You are a senior engineer. Evaluate code for security, performance,
-    maintainability, readability and architectural conformity.
-    Highlight critical issues and suggest improvements succinctly.
-```
+
+### How to Customize System Promts
+
+1. **Create/Edit Repository Rules**
+   Navigate to `config/repository_rules.yaml` and add your repository configuration:
+   ```yaml
+   repositories:
+     your-repo-name:           # Must match your Bitbucket repository name
+       description: "Brief description of your service"
+       tech_stack:             # Define your technology stack
+         language: "java"      # Programming language
+         version: "17"        # Language version
+         framework: "spring-boot"
+         database: "postgresql"
+         # Add any other tech stack details
+       
+       rules:                 # List of specific rules for this repository
+         - "Rule 1: Description"
+         - "Rule 2: Description"
+       
+       prompts:              # Custom prompts for different operations
+         code_review: |      # Used during code review
+           When reviewing this repository, ensure:
+           1. Rule-specific check
+           2. Another check...
+         
+         pr_analysis: |      # Used during PR analysis
+           For pull requests in this repository:
+           1. Specific check
+           2. Another check...
+   ```
+
+2. **Override Default Prompts**
+   - Repository-specific prompts in `repository_rules.yaml` override default prompts
+   - You can reference repository details in your prompts:
+    ```yaml
+    language: en
+    en:
+      pr_analysis_system_prompt: |
+        You are a senior engineer. Evaluate code for security, performance,
+        maintainability, readability and architectural conformity.
+        Highlight critical issues and suggest improvements succinctly.
+    ```
+
+3. **Testing Your Rules**
+   - Create a test PR in your repository
+   - Check the agent logs to verify your rules are being applied
+   - Review the AI analysis to ensure custom prompts are working
+
+4. **Best Practices**
+   - Keep rules specific and actionable
+   - Include both technical and process requirements
+   - Update rules when project requirements change
+   - Document special cases or exceptions
+   - Use clear, unambiguous language
+
+5. **Example Use Cases**
+   - Enforcing team-specific coding standards
+   - Managing different tech stacks across repositories
+   - Implementing security requirements per service
+   - Customizing review depth based on repository criticality
 
 ---
 
