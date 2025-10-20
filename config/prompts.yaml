@@ -96,7 +96,12 @@ tr:
     "🎯 SORUN: SQL injection vulnerability
     
     🔍 NEDEN: Kullanıcı input'u direkt SQL query'sine concatenate ediliyor (string interpolation). 
-    Saldırgan `user_id` parametresine `1 OR 1=1--` gönderirse tüm kayıtları görebilir.
+    Saldırgan `user_id` parametresine `1 OR 1=1--` gönderirse tüm kayıtları görebilir."
+
+  # Inline review için ek yönergeler
+  inline_review_instructions: |
+    Bu değişiklikleri incele ve gerekirse inline comment önerileri ver.
+    Sadece önemli konulara (bug, security, performance, best practices) yorum yap.
     
     ⚠️ RİSK: Tüm database'e unauthorized erişim, data breach, GDPR violation.
     

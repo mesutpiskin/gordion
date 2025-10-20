@@ -147,7 +147,8 @@ class StashAgentApp:
         agent = OllamaAgent(
             base_url=ollama_url,
             model=ollama_model,
-            temperature=ai_config.get('temperature', 0.3)
+            temperature=ai_config.get('temperature', 0.3),
+            warmup=True  # Enable model warm-up
         )
         
         # Check Ollama connection

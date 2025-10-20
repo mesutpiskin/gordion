@@ -17,7 +17,8 @@ class OllamaAgent:
     
     def __init__(self, base_url: str = "http://localhost:11434", 
                  model: str = "llama3.1:8b",
-                 temperature: float = 0.3):
+                 temperature: float = 0.3,
+                 warmup: bool = True):
         """
         Initialize Ollama agent
         
@@ -25,6 +26,7 @@ class OllamaAgent:
             base_url: Ollama API URL (default: http://localhost:11434)
             model: Model to use (e.g., llama3.1:8b, codellama:13b, mistral:7b)
             temperature: Temperature parameter
+            warmup: Whether to warmup the model on initialization
         """
         self.base_url = base_url.rstrip('/')
         self.model = model
@@ -45,6 +47,59 @@ class OllamaAgent:
         self.inline_prefix = lang_prompts.get('inline_comment_prefix', {})
         
         logger.info(f"Ollama agent initialized with language: {self.language}")
+        
+        # Warm up the model if requested
+        if warmup:
+            self.warmup_model()
+    
+    def warmup_model(self, retries: int = 3) -> bool:
+        """
+        Warm up the model by sending a simple request
+        This ensures the model is loaded and ready for subsequent requests
+        
+        Args:
+            retries: Number of retry attempts
+            
+        Returns:
+            True if warmup successful, False otherwise
+        """
+        logger.info(f"Warming up {self.model}...")
+        
+        # Simple prompt to warm up model
+        warmup_prompt = "Respond with 'OK' if you're ready."
+        
+        for attempt in range(retries):
+            try:
+                response = requests.post(
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "user", "content": warmup_prompt}
+                        ],
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.1,
+                            "num_predict": 10
+                        }
+                    },
+                    timeout=60  # Give enough time for initial model load
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"✅ {self.model} is warmed up and ready")
+                    return True
+                    
+            except requests.exceptions.Timeout:
+                logger.warning(f"Warmup attempt {attempt + 1}/{retries} timed out")
+            except Exception as e:
+                logger.warning(f"Warmup attempt {attempt + 1}/{retries} failed: {e}")
+            
+            if attempt < retries - 1:
+                logger.info("Retrying warmup...")
+        
+        logger.error(f"❌ Failed to warm up {self.model} after {retries} attempts")
+        return False
     
     def _load_prompts(self) -> Dict:
         """Load prompts from prompts.yaml"""
@@ -132,6 +187,87 @@ Respond in JSON format:
         except Exception as e:
             logger.error(f"Failed to check model availability: {e}")
             return False
+
+    def get_model_info(self) -> Dict:
+        """
+        Get detailed information about the current model
+        
+        Returns:
+            Dictionary with model details
+        """
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                models = response.json().get('models', [])
+                for model in models:
+                    if model.get('name') == self.model:
+                        return {
+                            'name': model.get('name'),
+                            'size': model.get('size', 0),
+                            'modified_at': model.get('modified_at', ''),
+                            'details': model.get('details', {}),
+                            'status': 'loaded' if self.check_connection() else 'not_loaded'
+                        }
+            return {}
+        except Exception as e:
+            logger.error(f"Failed to get model info: {e}")
+            return {}
+            
+    def get_system_metrics(self) -> Dict:
+        """
+        Get system resource usage metrics for Ollama
+        
+        Returns:
+            Dictionary with resource metrics
+        """
+        try:
+            import psutil
+            import subprocess
+            
+            metrics = {
+                'cpu_percent': 0,
+                'memory_percent': 0,
+                'memory_mb': 0,
+                'gpu_utilization': 'N/A',
+                'process_status': 'not_running'
+            }
+            
+            # Find Ollama process
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                if 'ollama' in proc.info['name'].lower():
+                    # Get CPU and memory usage
+                    try:
+                        process = psutil.Process(proc.info['pid'])
+                        metrics['cpu_percent'] = process.cpu_percent(interval=1)
+                        memory_info = process.memory_info()
+                        metrics['memory_mb'] = memory_info.rss / 1024 / 1024  # Convert to MB
+                        metrics['memory_percent'] = process.memory_percent()
+                        metrics['process_status'] = 'running'
+                        
+                        # Try to get GPU utilization if nvidia-smi is available
+                        try:
+                            nvidia_output = subprocess.check_output(['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'])
+                            gpu_util = nvidia_output.decode('utf-8').strip()
+                            if gpu_util.isdigit():
+                                metrics['gpu_utilization'] = f"{gpu_util}%"
+                        except (subprocess.CalledProcessError, FileNotFoundError):
+                            pass
+                            
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                    break
+                    
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"Failed to get system metrics: {e}")
+            return {
+                'cpu_percent': 0,
+                'memory_percent': 0,
+                'memory_mb': 0,
+                'gpu_utilization': 'N/A',
+                'process_status': 'error'
+            }
     
     def analyze_pull_request(self, pr_info: Dict) -> Optional[Dict]:
         """
@@ -164,7 +300,7 @@ Respond in JSON format:
                         "num_predict": 2000  # max tokens
                     }
                 },
-                timeout=60  # Ollama can be slower, give 60 seconds
+                timeout=300  # 5 minutes timeout for full diff analysis
             )
             
             if response.status_code != 200:
@@ -280,11 +416,36 @@ Respond in JSON format:
         diff = pr_info.get('diff', '')
         diff_preview = ""
         if diff:
-            # Truncate diff if too long (max 3000 chars for context)
-            if len(diff) > 3000:
-                diff_preview = diff[:3000] + "\n\n... (diff truncated)"
-            else:
-                diff_preview = diff
+            # Split into meaningful chunks by file
+            current_file = None
+            file_diffs = {}
+            current_lines = []
+            
+            for line in diff.split('\n'):
+                # Skip empty lines and diff markers
+                if not line.strip() or line.startswith('+++') or line.startswith('---'):
+                    continue
+                    
+                # New file marker
+                if line.startswith('diff --git'):
+                    if current_file and current_lines:
+                        file_diffs[current_file] = '\n'.join(current_lines)
+                    current_file = line.split(' b/')[-1]
+                    current_lines = [line]
+                else:
+                    if current_file:
+                        current_lines.append(line)
+            
+            # Add last file
+            if current_file and current_lines:
+                file_diffs[current_file] = '\n'.join(current_lines)
+            
+            # Build the preview with all changes
+            sections = []
+            for file_path, file_diff in file_diffs.items():
+                sections.append(f"File: {file_path}\n{file_diff}")
+            
+            diff_preview = "\n\n".join(sections)
         
         summary = f"""Pull Request Analizi
 
@@ -461,7 +622,12 @@ Bu diff'i incele ve approve edilip edilmemesi gerektiğini değerlendir."""
                             prefix = '+' if segment_type == 'ADDED' else '-'
                             summary += f"[Satır {line_num}] {prefix} {line_text}\n"
         
-        summary += "\n\nBu değişiklikleri incele ve gerekirse inline comment önerileri ver."
-        summary += "\nSadece önemli konulara (bug, security, performance, best practices) yorum yap."
+        # Get instructions from config
+        lang_prompts = self.prompts.get(self.language, self.prompts.get('tr', {}))
+        instructions = lang_prompts.get('inline_review_instructions', 
+            "Review these changes and provide inline comments if necessary.\n"
+            "Only comment on important issues (bugs, security, performance, best practices).")
+        
+        summary += f"\n\n{instructions}"
         
         return summary
