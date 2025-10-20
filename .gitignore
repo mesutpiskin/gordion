@@ -39,7 +39,6 @@ logs/
 
 # OS
 .DS_Store
-Thumbs.db
 *.plist
 
-.db
+*.db

@@ -7,6 +7,7 @@ import logging
 from typing import Dict, List, Optional
 from openai import OpenAI
 from repository_rules import RepositoryRulesManager
+from prompt_manager import PromptManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,8 @@ class AIAgent:
     
     def __init__(self, api_key: str, model: str = "gpt-4", 
                  temperature: float = 0.3, max_tokens: int = 2000,
-                 rules_config_path: str = "config/repository_rules.yaml"):
+                 rules_config_path: str = "config/repository_rules.yaml",
+                 prompts_path: str = "config/prompts.yaml"):
         """
         Initialize AI agent
         
@@ -26,31 +28,17 @@ class AIAgent:
             temperature: Temperature parameter
             max_tokens: Maximum tokens
             rules_config_path: Path to repository rules config
+            prompts_path: Path to prompts config file
         """
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.rules_manager = RepositoryRulesManager(rules_config_path)
+        self.prompt_manager = PromptManager(prompts_path)
         
-        self.system_prompt = """Sen bir kod review uzmanısın. Sana bir Pull Request'in detayları verilecek.
-Görevin, PR'ı analiz edip approve edilmesi gerekip gerekmediğini değerlendirmek.
-
-Değerlendirme kriterleri:
-1. Kod değişiklikleri mantıklı ve temiz mi?
-2. Potansiyel bug'lar var mı?
-3. Security riskleri var mı?
-4. Best practice'lere uyuyor mu?
-5. Test dosyaları dahil mi?
-6. Değişiklik miktarı makul mü?
-
-Cevabını şu JSON formatında ver (sadece JSON, başka açıklama ekleme):
-{
-  "approve": true/false,
-  "confidence_score": 0-100 arası sayı,
-  "reasoning": "detaylı açıklama",
-  "concerns": ["endişe 1", "endişe 2", ...]
-}"""
+        # Load system prompt from config based on active language
+        self.system_prompt = self.prompt_manager.get_prompt('pr_analysis_system_prompt')
     
     def _enhance_prompt_with_repo_rules(self, repository_name: str, prompt_type: str, base_prompt: str) -> str:
         """
@@ -111,13 +99,13 @@ Repository Specific Guidelines:
         Returns:
             Analysis results
         """
-        logger.info(f"Analyzing PR #{pr_info.get('id')} with AI...")
+        logger.info(f"Analyzing PR #{pr_data.get('id')} with AI...")
         
         # Prepare PR summary for AI
-        pr_summary = self._prepare_pr_summary(pr_info)
+        pr_summary = self._prepare_pr_summary(pr_data)
         
-        # Get base prompt from config
-        base_prompt = "Please review this pull request..."  # Load from config
+        # Get base prompt from config for active language
+        base_prompt = self.system_prompt
         
         # Enhance prompt with repository rules
         enhanced_prompt = self._enhance_prompt_with_repo_rules(

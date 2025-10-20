@@ -22,10 +22,10 @@ approval_criteria:
   - '*/.env*'
   - '*/credentials/*'
   decline_on_reject: false
-  mark_needs_work_on_reject: true
+  mark_needs_work_on_reject: false
   max_files_changed: 50
   max_lines_changed: 1000
-  min_confidence_score: 56
+  min_confidence_score: 70
 check_interval: 300
 dry_run: false
 logging:
