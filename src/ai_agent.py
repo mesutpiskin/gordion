@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, List, Optional
 from openai import OpenAI
-from .repository_rules import RepositoryRulesManager
+from repository_rules import RepositoryRulesManager
 
 logger = logging.getLogger(__name__)
 
